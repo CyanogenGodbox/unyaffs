@@ -67,7 +67,7 @@ static struct t_layout {
 	int chunk_size;
 	int spare_size;
 } possible_layouts[] =
-	{ { 2048, 64 }, { 4096, 128 }, { 8192, 256 }, { 8192, 448 }, { 16384, 512 } };
+	{ { 2048, 64 }, { 4096, 128 }, { 8192, 256 }, { 8192+2, 368-2 }, { 8192, 448 }, { 16384, 512 } };
 
 int max_layout = sizeof(possible_layouts) / sizeof(struct t_layout);
 
@@ -84,6 +84,7 @@ int warn_count = 0;
 int img_file;
 int opt_list;
 int opt_verbose;
+int opt_skip;
 
 typedef struct _object {
 	unsigned id;
@@ -589,7 +590,9 @@ Usage: unyaffs [-l <layout>] [-t] [-v] [-V] <image_file_name> [<base dir>]\n\
 		        possible_layouts[i].spare_size);
 	}
 
-	fprintf(stderr, "\
+	fprintf(stderr, "\n\
+    -s               skip first chunk + sparse bytes (for AC Ryan Veolo or\n\
+                     MMB-422.HDTV)\n\
     -t               list image contents\n\
     -v               verbose output\n\
     -V               print version\n\
@@ -604,7 +607,8 @@ int main(int argc, char **argv) {
 	/* handle command line options */
 	opt_list = 0;
 	opt_verbose = 0;
-	while ((ch = getopt(argc, argv, "l:tvVh?")) > 0) {
+	opt_skip = 0;
+	while ((ch = getopt(argc, argv, "l:tsvVh?")) > 0) {
 		switch (ch) {
 			case 'l':
 				if (optarg[0] < '0' ||
@@ -617,6 +621,9 @@ int main(int argc, char **argv) {
 				break;
 			case 'v':
 				opt_verbose = 1;
+				break;
+			case 's':
+				opt_skip = 1;
 				break;
 			case 'V':
 				printf("V%s\n", VERSION);
@@ -649,6 +656,10 @@ int main(int argc, char **argv) {
 		spare_size = possible_layouts[layout-1].spare_size;
 	}
 	spare_data = data + chunk_size;
+
+	// Skip first chunk
+	if (opt_skip)
+		lseek(img_file, chunk_size+spare_size, SEEK_SET);
 
 	if ((argc - optind) == 2 && !opt_list) {
 		if (mkdirpath(argv[optind+1]) < 0)
